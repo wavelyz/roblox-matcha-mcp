@@ -119,19 +119,30 @@ local function normalizeEvalChunk(source)
     return source
 end
 
-local function compileChunk(source)
-    local chunk = normalizeEvalChunk(source)
+local function loadChunk(source, chunkname)
     local fn, err
     if typeof(load) == "function" then
-        fn, err = load(chunk, "MatchaMCP", "t", EVAL_ENV)
+        fn, err = load(source, chunkname, "t", EVAL_ENV)
     end
     if not fn and typeof(loadstring) == "function" then
-        fn, err = loadstring(chunk, "MatchaMCP")
+        fn, err = loadstring(source, chunkname)
     end
     if not fn then
         error(tostring(err or "compile failed"))
     end
     return fn
+end
+
+local function compileChunk(source)
+    return loadChunk(normalizeEvalChunk(source), "MatchaMCP")
+end
+
+local function compileChunkStatements(source)
+    source = stripThreadPrefix(source or "")
+    if source == "" then
+        error("no source code provided")
+    end
+    return loadChunk(source, "MatchaMCP")
 end
 
 local function invokeChunk(fn)
@@ -253,6 +264,10 @@ local function runSource(source)
         error("code returned no values")
     end
     return packed[1]
+end
+
+local function runChunk(source)
+    invokeChunk(compileChunkStatements(source))
 end
 
 local function resolveInstancePath(path)
@@ -745,7 +760,7 @@ while true do
 
     bridge:BindToType("execute", function(data)
         task.defer(function()
-            runSource(data.source or data.code)
+            runChunk(data.source or data.code)
         end)
     end)
 
@@ -908,7 +923,7 @@ while true do
             JobId = game.JobId,
             PlaceName = placeName,
             Executor = executor,
-            ConnectorVersion = "eval-fix-2",
+            ConnectorVersion = "execute-fix-1",
         }
     end)
 
